@@ -1,49 +1,74 @@
-import numpy as np
 import pandas as pd
-from scipy.stats import chi2_contingency
+import numpy as np
+from scipy.stats import chi2, chi2_contingency
 
-n_on = 93         
-men_on = 31        
-women_on = n_on - men_on
+age_groups = [
+    "0 9", "10 19", "20 29", "30 39",
+    "40 49", "50 59", "60+"
+]
 
-n_off = 52
-men_off = 36
-women_off = n_off - men_off
+n_patients = [ 80,  90, 100, 110,  95,  85,  70]   # Σ = 630
 
-obs = pd.DataFrame({
-    "Мужчины": [men_on, men_off],
-    "Женщины": [women_on, women_off]
-}, index=["Очный", "Заочный"])
+deaths = [ 8,  9, 10, 12,  9,  8,  7]            # Σ = 63 (10 % от 630)
 
-print("Наблюдаемая таблица:")
-print(obs)
+survivors = [n - d for n, d in zip(n_patients, deaths)]
 
+df = pd.DataFrame({
+    "Всего": n_patients,
+    "Умерло": deaths,
+    "Выжило": survivors
+}, index=age_groups)
 
-def chi2_test(row):
-   
-    contingency = np.array([
-        [row["Мужчины"], row["Женщины"]],
-        [obs["Мужчины"].sum() - row["Мужчины"],
-         obs["Женщины"].sum() - row["Женщины"]]
+print("Исходные данные")
+print(df)
+
+expected_death_rate = 0.10
+df["Ож. умерло"] = df["Всего"] * expected_death_rate
+df["Ож. выжило"] = df["Всего"] - df["Ож. умерло"]
+
+print("\nОжидаемые частоты")
+print(df[["Ож. умерло", "Ож. выжило"]])
+
+min_expected = df[["Ож. умерло", "Ож. выжило"]].min().min()
+
+print(f"\n\tМинимальное ожидаемое значение = {min_expected:.2f} (должно быть ≥5)")
+
+def chi2_component(observed, expected):
+   """Возвращает (χ² компонент, p значение) для 2×2 таблицы."""
+   contingency = np.array([
+        [observed["Умерло"], observed["Выжило"]],
+        [df["Умерло"].sum() - observed["Умерло"],
+         df["Выжило"].sum() - observed["Выжило"]]
     ])
-    chi2, p, dof, _ = chi2_contingency(contingency, correction=False)
-    return chi2, p
+   chi2, p, dof, expected = chi2_contingency(contingency, correction=False)
+   return chi2, p, dof, expected
 
-chi2_on, p_on = chi2_test(obs.loc["Очный"])
-chi2_off, p_off = chi2_test(obs.loc["Заочный"])
 
-print("\nОтдельные потоки:")
-print(f"Очный: χ² = {chi2_on:.4f}, p = {p_on:.4f}")
+df[["χ²", "p"]] = df.apply(
+    lambda row: pd.Series({
+        "χ²": chi2_component(row, None)[0],
+        "p": chi2_component(row, None)[1]
+    }),
+    axis=1
+)
 
-print(f"Заочный: χ² = {chi2_off:.4f}, p = {p_off:.4f}")
+print("\nχ² компоненты по группам:")
+print(df[["χ²", "p"]])
 
-chi2_total, p_total, dof_total, _ = chi2_contingency(obs.values, correction=False)
+observed_matrix = df[["Умерло", "Выжило"]].values
+expected_matrix = df[["Ож. умерло", "Ож. выжило"]].values
 
-print("\nСовокупный тест:")
+chi2_total, p_total, dof_total, _ = chi2_contingency(
+    observed_matrix, 
+    correction=False, 
+    lambda_="log-likelihood"   
+)
+
+print("\nСовокупный χ² тест (7 df)")
 print(f"χ² = {chi2_total:.4f}, df = {dof_total}, p = {p_total:.4f}")
 
-expected = chi2_contingency(obs.values, correction=False)[3] 
-min_expected = expected.min()
-print("\nУсловия применимости χ² теста:")
-print(f"Минимальное ожидаемое значение = {min_expected:.2f} (должно быть ≥ 5)")
-print(f"Общее число наблюдений = {obs.values.sum()} (должно быть ≥ 20)")
+df_reduced = 6
+p_reduced = 1 - chi2.cdf(chi2_total, df_reduced)
+
+print("\nКорректировка df до 6 (общая летальность фиксирована)")
+print(f"χ² = {chi2_total:.4f}, df = {df_reduced}, p = {p_reduced:.4f}")
