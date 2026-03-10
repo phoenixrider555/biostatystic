@@ -87,3 +87,10 @@ forest_plot(df, 'RR', 'RR_low', 'RR_high',
 # OR plot
 forest_plot(df, 'OR', 'OR_low', 'OR_high',
             'Отношение шансов (OR) с 95 % ДИ')
+df['z_RR'] = df['logRR'] / df['se_logRR']
+df['p_RR'] = 2 * (1 - norm.cdf(np.abs(df['z_RR'])))
+
+df['z_OR'] = df['logOR'] / df['se_logOR']
+df['p_OR'] = 2 * (1 - norm.cdf(np.abs(df['z_OR'])))
+
+print(df[['p_RR','p_OR']].round(4))
