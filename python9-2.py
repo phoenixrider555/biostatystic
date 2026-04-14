@@ -37,3 +37,30 @@ print(f"95 % CI для числа случаев: [{ci_low}, {ci_high}]")
 ci_low_rate  = ci_low / n
 ci_high_rate = ci_high / n
 print(f"95 % CI частоты: [{ci_low_rate:.5f}, {ci_high_rate:.5f}]")
+
+# Счётчики
+a1, n1 = 4, 1000   # первая группа
+a2, n2 = 9, 1000   # вторая группа
+
+# Таблица 2×2
+#          | заболел | не заболел |
+# первая   |   a1    | n1-a1      |
+# вторая   |   a2    | n2-a2      |
+obs = np.array([[a1, n1-a1],
+                [a2, n2-a2]])
+
+chi2, p_chi2, dof, exp = st.chi2_contingency(obs, correction=False)
+print(f"χ² = {chi2:.3f}, p value = {p_chi2:.3f}")
+
+rates = np.array([a1/n1, a2/n2])
+labels = ['Группа 1', 'Группа 2']
+
+plt.figure(figsize=(5,3))
+plt.bar(labels, rates, color=['cornflowerblue','salmon'])
+plt.title('Сравнение частот заболеваний')
+plt.ylabel('Частота (на 1)')
+plt.ylim(0, max(rates)*1.5)
+for i, r in enumerate(rates):
+    plt.text(i, r+0.001, f"{r:.4f}", ha='center')
+plt.tight_layout()
+plt.show()
